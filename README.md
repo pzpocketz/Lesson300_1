@@ -21,7 +21,7 @@ npm install
 npm run dev
 ```
 
-The current-conditions panel uses the Open-Meteo geocoding and forecast APIs and needs an internet connection. The historical 2025 field ledger is fictional and reproducible:
+The current-conditions panel uses the Open-Meteo geocoding and forecast APIs and needs an internet connection. The fictional field ledger is reproducible and covers January 1 through the current local date:
 
 ```sh
 npm run data:generate

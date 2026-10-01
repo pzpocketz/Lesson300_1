@@ -3,7 +3,9 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const year = 2025
+const asOfDate = new Date()
+const year = asOfDate.getFullYear()
+const lastDate = new Date(Date.UTC(year, asOfDate.getMonth(), asOfDate.getDate()))
 let seed = 3001
 
 function random() {
@@ -66,7 +68,7 @@ function chooseWeather() {
 }
 
 const daily = []
-for (let date = new Date(Date.UTC(year, 0, 1)); date.getUTCFullYear() === year; date.setUTCDate(date.getUTCDate() + 1)) {
+for (let date = new Date(Date.UTC(year, 0, 1)); date <= lastDate; date.setUTCDate(date.getUTCDate() + 1)) {
   const month = date.getUTCMonth()
   const weather = chooseWeather()
   const openWindowFactor = month >= 3 && month <= 8 ? 1.2 : 1
@@ -128,4 +130,4 @@ const dataset = { year, rooms, pests: pests.map(({ id, name }) => ({ id, name })
 const outputPath = resolve(projectRoot, 'src/data/metrics.json')
 mkdirSync(dirname(outputPath), { recursive: true })
 writeFileSync(outputPath, `${JSON.stringify(dataset, null, 2)}\n`)
-console.log(`Generated ${daily.length} daily records for ${year}: ${outputPath}`)
+console.log(`Generated ${daily.length} year-to-date records through ${lastDate.toISOString().slice(0, 10)}: ${outputPath}`)

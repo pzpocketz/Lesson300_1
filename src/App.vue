@@ -67,6 +67,7 @@ const orderedItems = ref<string[]>([])
 const notice = ref('')
 
 const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const availableMonths = monthNames.slice(0, Number(metrics.daily[metrics.daily.length - 1].date.slice(5, 7)))
 const navItems = [
   { id: 'dashboard' as const, label: 'Home overview', icon: House },
   { id: 'payroll' as const, label: 'Pawroll', icon: Users },
@@ -127,11 +128,11 @@ const pestRows = computed(() => metrics.pests.map((pest) => {
 }).sort((a, b) => b.sightings - a.sightings))
 
 const monthlyData = computed<ChartData<'line'>>(() => ({
-  labels: monthNames,
+  labels: availableMonths,
   datasets: [
     {
       label: 'Sightings',
-      data: monthNames.map((_, month) => filteredDays.value
+      data: availableMonths.map((_, month) => filteredDays.value
         .filter((day) => Number(day.date.slice(5, 7)) - 1 === month)
         .reduce((sum, day) => sum + countsForDay(day).sightings, 0)),
       borderColor: '#c96f50',
@@ -143,7 +144,7 @@ const monthlyData = computed<ChartData<'line'>>(() => ({
     },
     {
       label: 'Vanquished',
-      data: monthNames.map((_, month) => filteredDays.value
+      data: availableMonths.map((_, month) => filteredDays.value
         .filter((day) => Number(day.date.slice(5, 7)) - 1 === month)
         .reduce((sum, day) => sum + countsForDay(day).kills, 0)),
       borderColor: '#317467',
@@ -221,8 +222,8 @@ const alertItems = computed(() => {
   return items.slice(0, 4)
 })
 
-const periodLabel = computed(() => selectedMonth.value === 'all' ? `Full year ${metrics.year}` : `${monthNames[Number(selectedMonth.value)]} ${metrics.year}`)
-const selectedMonthLabel = computed(() => selectedMonth.value === 'all' ? 'All months' : `${monthNames[Number(selectedMonth.value)]} ${metrics.year}`)
+const periodLabel = computed(() => selectedMonth.value === 'all' ? `Year to date ${metrics.year}` : `${monthNames[Number(selectedMonth.value)]} ${metrics.year}`)
+const selectedMonthLabel = computed(() => selectedMonth.value === 'all' ? 'Year to date' : `${monthNames[Number(selectedMonth.value)]} ${metrics.year}`)
 const selectedRoomLabel = computed(() => selectedRoom.value === 'all' ? 'Every room' : metrics.rooms.find((room) => room.id === selectedRoom.value)?.name ?? 'Every room')
 const selectedPestLabel = computed(() => selectedPest.value === 'all' ? 'All pests' : metrics.pests.find((pest) => pest.id === selectedPest.value)?.name ?? 'All pests')
 const weatherDescription = computed(() => weatherNow.value ? weatherCodeLabel(weatherNow.value.code) : '')
@@ -437,7 +438,7 @@ onMounted(() => {
           <div>
             <p class="eyebrow"><span class="eyebrow-rule"></span> THE HOME PATROL · {{ metrics.year }}</p>
             <h1>A cleaner home,<br class="mobile-break" /> one pounce at a time.</h1>
-            <p class="heading-subtitle">A year of watchful whiskers, open windows, and fewer uninvited guests.</p>
+            <p class="heading-subtitle">So far this year: watchful whiskers, open windows, and fewer uninvited guests.</p>
           </div>
           <div class="heading-seal" aria-hidden="true">
             <span class="seal-rays"></span>
@@ -449,7 +450,7 @@ onMounted(() => {
         <section class="filter-row" aria-label="Dashboard filters">
           <div class="filter-context"><span class="live-dot"></span><strong>{{ periodLabel }}</strong><span class="filter-divider"></span><span>Field ledger</span></div>
           <div class="filter-controls">
-            <label class="filter-select-wrap"><span class="sr-only">Filter by month</span><select v-model="selectedMonth" aria-label="Filter by month"><option value="all">All months</option><option v-for="(month, index) in monthNames" :key="month" :value="String(index)">{{ month }} {{ metrics.year }}</option></select><span class="filter-select-value" aria-hidden="true">{{ selectedMonthLabel }}</span><CaretDown :size="13" /></label>
+            <label class="filter-select-wrap"><span class="sr-only">Filter by month</span><select v-model="selectedMonth" aria-label="Filter by month"><option value="all">Year to date</option><option v-for="(month, index) in availableMonths" :key="month" :value="String(index)">{{ month }} {{ metrics.year }}</option></select><span class="filter-select-value" aria-hidden="true">{{ selectedMonthLabel }}</span><CaretDown :size="13" /></label>
             <label class="filter-select-wrap"><span class="sr-only">Filter by room</span><select v-model="selectedRoom" aria-label="Filter by room"><option value="all">Every room</option><option v-for="room in metrics.rooms" :key="room.id" :value="room.id">{{ room.name }}</option></select><span class="filter-select-value" aria-hidden="true">{{ selectedRoomLabel }}</span><CaretDown :size="13" /></label>
             <label class="filter-select-wrap"><span class="sr-only">Filter by pest</span><select v-model="selectedPest" aria-label="Filter by pest"><option value="all">All pests</option><option v-for="pest in metrics.pests" :key="pest.id" :value="pest.id">{{ pest.name }}</option></select><span class="filter-select-value" aria-hidden="true">{{ selectedPestLabel }}</span><CaretDown :size="13" /></label>
           </div>
@@ -515,7 +516,7 @@ onMounted(() => {
           <article class="panel chart-panel trend-panel">
             <div class="panel-heading"><div><p class="panel-eyebrow">FIELD NOTES · {{ periodLabel.toUpperCase() }}</p><h2>Seen, then sorted</h2></div><div class="chart-legend"><span><i class="legend-dot coral-dot"></i>Sightings</span><span><i class="legend-dot green-dot"></i>Vanquished</span></div></div>
             <div class="chart-wrap"><Line :data="monthlyData" :options="chartOptions" /></div>
-            <p class="chart-alt">{{ totals.sightings.toLocaleString() }} sightings and {{ totals.kills.toLocaleString() }} vanquishes {{ selectedMonth === 'all' ? 'across the year' : `in ${periodLabel}` }}. Workday weather averaged {{ weatherStats.average }}°; {{ weatherStats.wet }} days brought rain.</p>
+            <p class="chart-alt">{{ totals.sightings.toLocaleString() }} sightings and {{ totals.kills.toLocaleString() }} vanquishes {{ selectedMonth === 'all' ? 'year to date' : `in ${periodLabel}` }}. Workday weather averaged {{ weatherStats.average }}°; {{ weatherStats.wet }} days brought rain.</p>
           </article>
           <article class="panel chart-panel room-panel">
             <div class="panel-heading"><div><p class="panel-eyebrow">ROOM-BY-ROOM</p><h2>Where the paws land</h2></div><span class="mini-tag"><House :size="14" /> {{ roomRows[0]?.name }} leads</span></div>
@@ -565,7 +566,7 @@ onMounted(() => {
           <div><p class="eyebrow"><span class="eyebrow-rule"></span> THE HOME PATROL · {{ metrics.year }}</p><h1>A fair day's catch.</h1><p class="heading-subtitle">Two good cats, honest work, and a treat for every triumph.</p></div>
           <button class="primary-action" @click="exportPayroll"><ArrowUpRight :size="16" /> Export pawroll</button>
         </section>
-        <section class="filter-row"><div class="filter-context"><span class="live-dot"></span><strong>{{ periodLabel }}</strong><span class="filter-divider"></span><span>Team ledger</span></div><div class="filter-controls"><label class="filter-select-wrap"><span class="sr-only">Filter payroll by month</span><select v-model="selectedMonth" aria-label="Filter payroll by month"><option value="all">All months</option><option v-for="(month, index) in monthNames" :key="month" :value="String(index)">{{ month }} {{ metrics.year }}</option></select><span class="filter-select-value" aria-hidden="true">{{ selectedMonthLabel }}</span><CaretDown :size="13" /></label></div></section>
+        <section class="filter-row"><div class="filter-context"><span class="live-dot"></span><strong>{{ periodLabel }}</strong><span class="filter-divider"></span><span>Team ledger</span></div><div class="filter-controls"><label class="filter-select-wrap"><span class="sr-only">Filter payroll by month</span><select v-model="selectedMonth" aria-label="Filter payroll by month"><option value="all">Year to date</option><option v-for="(month, index) in availableMonths" :key="month" :value="String(index)">{{ month }} {{ metrics.year }}</option></select><span class="filter-select-value" aria-hidden="true">{{ selectedMonthLabel }}</span><CaretDown :size="13" /></label></div></section>
         <section class="payroll-summary">
           <div class="payroll-total"><span class="panel-eyebrow">TREAT PAY · {{ periodLabel.toUpperCase() }}</span><strong>{{ payrollRows.reduce((sum, row) => sum + row.treats, 0).toLocaleString() }} <small>treats</small></strong><span>{{ totals.shifts }} completed shifts and {{ totals.naps }} earned naps</span></div>
           <div class="payroll-stamp"><PawPrint :size="28" weight="duotone" /><span>GOOD<br />CATS</span></div>
