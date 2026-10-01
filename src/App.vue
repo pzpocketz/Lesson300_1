@@ -48,6 +48,10 @@ type WeatherNow = {
 }
 
 const theme = useTheme()
+const accessKey = 'jupiter-pest-control-approved'
+const authenticated = ref(sessionStorage.getItem(accessKey) === 'true')
+const loginPassword = ref('')
+const loginError = ref('')
 const drawer = ref(false)
 const darkMode = ref(false)
 const activePage = ref<Page>('dashboard')
@@ -316,6 +320,19 @@ function switchPage(page: Page) {
   drawer.value = false
 }
 
+function submitLogin() {
+  if (loginPassword.value !== 'protogen2026') {
+    loginError.value = 'That password is not quite right. Try again.'
+    return
+  }
+
+  sessionStorage.setItem(accessKey, 'true')
+  authenticated.value = true
+  loginPassword.value = ''
+  loginError.value = ''
+  void updateWeather()
+}
+
 function scrollToAlerts() {
   document.getElementById('alerts')?.scrollIntoView({ behavior: 'smooth' })
 }
@@ -348,11 +365,30 @@ function exportPayroll() {
   URL.revokeObjectURL(link.href)
 }
 
-onMounted(() => { void updateWeather() })
+onMounted(() => {
+  if (authenticated.value) void updateWeather()
+})
 </script>
 
 <template>
   <v-app :class="{ 'theme-dark': darkMode }">
+    <section v-if="!authenticated" class="login-stage" aria-labelledby="login-title">
+      <div class="login-panel">
+        <div class="login-brand-mark"><PawPrint :size="29" weight="duotone" /></div>
+        <p class="login-eyebrow"><span></span> JUPITER'S PEST CONTROL <span></span></p>
+        <h1 id="login-title">A private field ledger.</h1>
+        <p class="login-copy">Enter the password to open the home patrol dashboard.</p>
+        <form class="login-form" @submit.prevent="submitLogin">
+          <label for="dashboard-password">Password</label>
+          <input id="dashboard-password" v-model="loginPassword" type="password" name="password" autocomplete="current-password" required autofocus :aria-invalid="Boolean(loginError)" :aria-describedby="loginError ? 'login-error' : undefined" />
+          <p v-if="loginError" id="login-error" class="login-error" role="alert">{{ loginError }}</p>
+          <button class="primary-action login-submit" type="submit">Submit <ArrowUpRight :size="16" /></button>
+        </form>
+        <div class="login-footer"><span></span><PawPrint :size="14" weight="duotone" /><span></span></div>
+      </div>
+      <p class="login-caption">JPC · EST. WHENEVER THE SUN IS OUT</p>
+    </section>
+    <template v-else>
     <v-navigation-drawer v-model="drawer" temporary location="left" width="296" class="navigation-sheet">
       <div class="drawer-brand">
         <div class="brand-mark"><PawPrint :size="23" weight="duotone" /></div>
@@ -562,5 +598,6 @@ onMounted(() => { void updateWeather() })
       <footer class="page-footer"><span>JPC · {{ metrics.year }} FIELD LEDGER</span><span><PawPrint :size="13" weight="duotone" /> Compiled with care, and one very clean paw.</span></footer>
     </main>
     <div v-if="notice" class="toast-notice" role="status"><CheckCircle :size="17" />{{ notice }}</div>
+    </template>
   </v-app>
 </template>
