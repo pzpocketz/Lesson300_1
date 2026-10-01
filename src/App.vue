@@ -22,6 +22,8 @@ import {
   PhCaretDown as CaretDown,
   PhCheckCircle as CheckCircle,
   PhCloudSun as CloudSun,
+  PhBug as FlyIcon,
+  PhBugBeetle as BeetleIcon,
   PhHouse as House,
   PhList as List,
   PhMapPin as MapPin,
@@ -73,6 +75,10 @@ const navItems = [
   { id: 'payroll' as const, label: 'Pawroll', icon: Users },
   { id: 'inventory' as const, label: 'Treat cupboard', icon: ArchiveBox },
 ]
+const pestIcons = {
+  beetles: BeetleIcon,
+  flies: FlyIcon,
+}
 
 const filteredDays = computed(() => metrics.daily.filter((day) =>
   selectedMonth.value === 'all' || Number(day.date.slice(5, 7)) - 1 === Number(selectedMonth.value),
@@ -551,7 +557,15 @@ onMounted(() => {
             <div class="panel-heading"><div><p class="panel-eyebrow">THE UNINVITED</p><h2>Pest roll call</h2></div><span class="pest-total"><PawPrint :size="15" /> {{ totals.sightings.toLocaleString() }}</span></div>
             <div class="pest-list">
               <div v-for="(pest, index) in pestRows" :key="pest.id" class="pest-row">
-                <span class="pest-portrait" :class="`pest-tone-${index}`"><PawPrint :size="17" weight="duotone" /></span>
+                <span class="pest-portrait" :class="`pest-tone-${index}`" aria-hidden="true">
+                  <svg v-if="pest.id === 'spiders'" class="spider-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 9 5 6 2.5 7M8 11 4 10 2 12M8 14 4 16 2.5 15M9 16 6 20 3.5 20M15 9l4-3 2.5 1M16 11l4-1 2 2M16 14l4 2 2-1M15 16l3 4 2.5 0" />
+                    <circle cx="12" cy="9" r="2" />
+                    <ellipse cx="12" cy="15" rx="3" ry="4" />
+                  </svg>
+                  <PawPrint v-else-if="pest.id === 'mice'" :size="18" weight="duotone" />
+                  <component :is="pestIcons[pest.id as keyof typeof pestIcons]" v-else :size="18" weight="duotone" />
+                </span>
                 <span class="pest-name">{{ pest.name }}<small>{{ Math.round(totals.sightings ? pest.sightings / totals.sightings * 100 : 0) }}% of sightings</small></span>
                 <span class="pest-count"><strong>{{ pest.sightings.toLocaleString() }}</strong><small>seen</small></span>
                 <span class="pest-count killed"><strong>{{ pest.kills.toLocaleString() }}</strong><small>caught</small></span>

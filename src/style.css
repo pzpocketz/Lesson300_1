@@ -227,6 +227,7 @@ h2 { margin-top: 4px; color: var(--ink); font-family: var(--display); font-size:
 .pest-tone-1 { color: #a17a26; background: #f5ecd1; }
 .pest-tone-2 { color: #367b79; background: #ddecdf; }
 .pest-tone-3 { color: #6d7653; background: #e7eadb; }
+.spider-icon { width: 16px; height: 16px; }
 .pest-name { display: grid; gap: 1px; min-width: 0; color: var(--ink); font-size: 11px; font-weight: 700; }
 .pest-name small, .pest-count small { color: var(--muted); font-size: 9px; font-weight: 400; }
 .pest-count { display: grid; min-width: 48px; margin-left: auto; text-align: right; }
