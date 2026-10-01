@@ -15,18 +15,21 @@ The interface should feel cheerful, nostalgic, and polished rather than childish
 -flat illustration 
 -bold typography
 -rounded cards
-- illustrated patterns, cat and mouse icons, jungle leaves, Egyptian cat-god references 
+-illustrated patterns
 
 ---
 
 ## Layout
 -Should be viewable on mobile and desktop breakpoints
--Showcase the stats of household rooms, pest types, pest kill count versus pest sighting ratio by pest type and room, treat inventory and nap count for energy levels and give advice on what rooms to focus on next.
+-Showcase the stats of household rooms, pest types, pest kill count versus pest sighting by pest type and room, treat inventory and nap count for energy levels and give advice on what rooms to focus on next.
+-Compare sightings and vanquishes in a room-by-pest ledger. Show a vanquish rate (kills divided by sightings); do not label this as accuracy without independently verified counts.
+-Include a simulated 1–5 enjoyment score for each cat's patrol shifts, and summarize enjoyment by employee.
+-Track client treat revenue separately from employee treat pay.
 -Make everything interactive and filterable
 -Top navigation should contain the logo and a hamburger menu that opens a side sheet that overlays the dashboard offering other pages that allow the user to see pay roll, inventory needs, and the home dashboard.
--Dashboard should give an overview of all the information and a weather widget using the Open-Meteo that tells the weather currently, but also show what the weather was for each work day in the charts to help the owner determine if low kill counts and pest sightings were due to the weather or not. 
+-Dashboard should give an overview of all the information and an Open-Meteo weather widget for current conditions and the upcoming seven-day forecast. Use Oakland historical daily weather alongside each synthetic workday so the owner can compare weather and patrol outcomes.
 -Payroll page should showcase the employee name, shift (A.M. or P.M.), pests vanquished, overall pay (in treats), and days worked.
--Let’s show an alerts panel if the owner is low on treats or sunshine is expected and when, or if there is a type of pest like mouse, beetle or fly that is appearing in unusually high numbers. 
+-Let’s show an alerts panel if the owner is low on treats, sunshine is expected and when, or pest sightings rise against the previous 14 patrols.
 
 ---
 
@@ -131,10 +134,11 @@ Use a light and dark theme that has a toggle to switch
 | Weather app  | Open-meteo         |
 
 ## Data
-Generate a fake dataset as a JSON file (src/data/metrics.json). The dataset should contain household room types by name, pest sightings (beetles, flies, spiders, mice), pest kills, treat inventory, and payrole (in treats and naps) for two employees. The time range should be for one year only. And let’s assume this is a popular home for pests that is very open-window oriented. Kills and pest sightings should correlate loosely. Make the numbers feel realistic with some seasonal patterns, natural variation. Not too perfect. 
--treat revenue 
+Generate a reproducible JSON file (`src/data/metrics.json`) from January 1 through the current local date. Use real Oakland historical weather from Open-Meteo; pest sightings, kills, inventory, treat revenue, employee pay, naps, and enjoyment remain synthetic. Assume a popular, open-window-oriented home, loose relationships between sightings and kills, and seasonal variation. 
+-treat revenue and employee treat pay
 -number of pests each day/month
--kill count accuracy average
+-vanquish rate (kills divided by sightings; not detection accuracy)
+-average enjoyment rating by employee
 -hourly kills
 -kills by day
 -pest type popularity

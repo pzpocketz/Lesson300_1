@@ -21,7 +21,9 @@ import {
   PhBell as Bell,
   PhCaretDown as CaretDown,
   PhCheckCircle as CheckCircle,
+  PhCloudRain as CloudRain,
   PhCloudSun as CloudSun,
+  PhCat as CatIcon,
   PhBug as FlyIcon,
   PhBugBeetle as BeetleIcon,
   PhHouse as House,
@@ -47,6 +49,14 @@ type WeatherNow = {
   humidity: number
   city: string
   country: string
+  forecast: WeatherForecastDay[]
+}
+type WeatherForecastDay = {
+  date: string
+  code: number
+  high: number
+  precipitationProbability: number
+  sunshineHours: number
 }
 
 const theme = useTheme()
@@ -98,15 +108,23 @@ const totals = computed(() => {
     const count = countsForDay(day)
     sum.sightings += count.sightings
     sum.kills += count.kills
+    sum.treatRevenue += day.treatRevenue
     return sum
-  }, { sightings: 0, kills: 0 })
+  }, { sightings: 0, kills: 0, treatRevenue: 0 })
   const crewTotals = filteredDays.value.flatMap((day) => day.crew).reduce((sum, shift) => {
     sum.treats += shift.treats
     sum.naps += shift.naps
     sum.shifts += 1
+    sum.enjoymentTotal += shift.enjoymentScore
     return sum
-  }, { treats: 0, naps: 0, shifts: 0 })
-  return { ...pestTotals, ...crewTotals, rate: pestTotals.sightings ? Math.round((pestTotals.kills / pestTotals.sightings) * 100) : 0 }
+  }, { treats: 0, naps: 0, shifts: 0, enjoymentTotal: 0 })
+  const { enjoymentTotal, ...crewStats } = crewTotals
+  return {
+    ...pestTotals,
+    ...crewStats,
+    averageEnjoyment: crewTotals.shifts ? Number((enjoymentTotal / crewTotals.shifts).toFixed(1)) : 0,
+    vanquishRate: pestTotals.sightings ? Math.round((pestTotals.kills / pestTotals.sightings) * 100) : 0,
+  }
 })
 
 const roomRows = computed(() => metrics.rooms.map((room) => {
@@ -119,6 +137,24 @@ const roomRows = computed(() => metrics.rooms.map((room) => {
   }, { sightings: 0, kills: 0 })
   return { ...room, ...totalsForRoom }
 }).sort((a, b) => b.sightings - a.sightings))
+
+const roomPestRows = computed(() => metrics.rooms
+  .filter((room) => selectedRoom.value === 'all' || room.id === selectedRoom.value)
+  .map((room) => ({
+    ...room,
+    pests: metrics.pests
+      .filter((pest) => selectedPest.value === 'all' || pest.id === selectedPest.value)
+      .map((pest) => {
+        const counts = filteredDays.value.reduce((sum, day) => {
+          const roomDay = day.rooms.find((entry) => entry.roomId === room.id)
+          const pestDay = roomDay?.pests.find((entry) => entry.pestId === pest.id)
+          sum.sightings += pestDay?.sightings ?? 0
+          sum.kills += pestDay?.kills ?? 0
+          return sum
+        }, { sightings: 0, kills: 0 })
+        return { ...pest, ...counts, vanquishRate: counts.sightings ? Math.round(counts.kills / counts.sightings * 100) : 0 }
+      }),
+  })))
 
 const pestRows = computed(() => metrics.pests.map((pest) => {
   const result = filteredDays.value.reduce((sum, day) => {
@@ -207,6 +243,7 @@ const payrollRows = computed(() => metrics.employees.map((employee) => {
     treats: shifts.reduce((sum, shift) => sum + shift.treats, 0),
     naps: shifts.reduce((sum, shift) => sum + shift.naps, 0),
     hours: shifts.reduce((sum, shift) => sum + shift.hours, 0),
+    enjoyment: shifts.length ? Number((shifts.reduce((sum, shift) => sum + shift.enjoymentScore, 0) / shifts.length).toFixed(1)) : 0,
   }
 }))
 
@@ -217,13 +254,33 @@ const inventoryRows = computed(() => metrics.inventory.filter((item) =>
 const alertItems = computed(() => {
   const items = metrics.inventory.filter((item) => item.quantity < item.threshold)
     .map((item) => ({ title: `${item.name} is running low`, detail: `${item.quantity} ${item.unit} left · reorder point ${item.threshold}`, kind: 'warning' }))
-  if (weatherNow.value && [0, 1, 2].includes(weatherNow.value.code)) {
-    items.push({ title: 'Golden patrol weather', detail: `Clear skies in ${weatherNow.value.city} · a fine day for window watch`, kind: 'sunny' })
+  const sunnyDay = weatherNow.value?.forecast.slice(1).find((day) => [0, 1, 2].includes(day.code) && day.sunshineHours >= 4)
+  if (sunnyDay && weatherNow.value) {
+    items.push({ title: 'Sunshine on the schedule', detail: `${formatWeekday(sunnyDay.date)} · about ${sunnyDay.sunshineHours} hours of sun in ${weatherNow.value.city}`, kind: 'sunny' })
   }
-  const busiestPest = pestRows.value[0]
-  const pestShare = totals.value.sightings ? busiestPest.sightings / totals.value.sightings : 0
-  if (busiestPest.sightings > 0 && pestShare >= 0.3) {
-    items.push({ title: `${busiestPest.name} sightings are elevated`, detail: `${busiestPest.name} account for ${Math.round(pestShare * 100)}% of recorded sightings`, kind: 'pest' })
+  const workDays = filteredDays.value.filter((day) => day.crew.length > 0)
+  const recentDays = workDays.slice(-14)
+  const previousDays = workDays.slice(-28, -14)
+  if (recentDays.length === 14 && previousDays.length === 14) {
+    const pestTrends = metrics.pests
+      .filter((pest) => selectedPest.value === 'all' || pest.id === selectedPest.value)
+      .map((pest) => {
+        const recent = recentDays.reduce((sum, day) => sum + (day.rooms
+          .filter((room) => selectedRoom.value === 'all' || room.roomId === selectedRoom.value)
+          .flatMap((room) => room.pests)
+          .find((item) => item.pestId === pest.id)?.sightings ?? 0), 0)
+        const previous = previousDays.reduce((sum, day) => sum + (day.rooms
+          .filter((room) => selectedRoom.value === 'all' || room.roomId === selectedRoom.value)
+          .flatMap((room) => room.pests)
+          .find((item) => item.pestId === pest.id)?.sightings ?? 0), 0)
+        return { ...pest, recent, previous }
+      })
+      .sort((a, b) => (b.recent - b.previous) - (a.recent - a.previous))
+    const elevatedPest = pestTrends.find((pest) => pest.recent > pest.previous && pest.recent >= Math.max(7, pest.previous * 1.4))
+    if (elevatedPest) {
+      const increase = Math.round((elevatedPest.recent / Math.max(1, elevatedPest.previous) - 1) * 100)
+      items.push({ title: `${elevatedPest.name} sightings are up`, detail: `${elevatedPest.recent} in the last 14 patrols · ${increase}% above the prior 14`, kind: 'pest' })
+    }
   }
   return items.slice(0, 4)
 })
@@ -237,9 +294,19 @@ const weatherStats = computed(() => {
   const observations = filteredDays.value.filter((day) => day.crew.length > 0).map((day) => day.weather)
   return {
     average: observations.length ? Math.round(observations.reduce((sum, item) => sum + item.temperature, 0) / observations.length) : 0,
-    clear: observations.filter((item) => [0, 1, 2].includes(item.code)).length,
-    wet: observations.filter((item) => item.code >= 51).length,
+    clear: observations.filter((item) => item.sunshineHours >= 6).length,
+    wet: observations.filter((item) => item.precipitationMm >= 1).length,
   }
+})
+
+const weatherImpact = computed(() => {
+  const workDays = filteredDays.value.filter((day) => day.crew.length > 0)
+  const clearDays = workDays.filter((day) => day.weather.sunshineHours >= 6 && day.weather.precipitationMm < 1)
+  const wetDays = workDays.filter((day) => day.weather.precipitationMm >= 1)
+  const averageKills = (days: typeof workDays) => days.length
+    ? Math.round(days.reduce((sum, day) => sum + countsForDay(day).kills, 0) / days.length)
+    : null
+  return { clearAverage: averageKills(clearDays), wetAverage: averageKills(wetDays), clearDays: clearDays.length, wetDays: wetDays.length }
 })
 
 const chartOptions: ChartOptions<'line'> = {
@@ -277,7 +344,7 @@ const dailyChartOptions: ChartOptions<'line'> = {
       callbacks: {
         afterBody: (items) => {
           const day = recentDays.value[items[0]?.dataIndex ?? -1]
-          return day ? [`Weather: ${day.weather.label}, ${day.weather.temperature}°C`, `Rain chance: ${day.weather.rainProbability}%`] : []
+          return day ? [`Oakland weather: ${day.weather.label}, ${day.weather.temperature}°C`, `Rainfall: ${day.weather.precipitationMm} mm · Sunshine: ${day.weather.sunshineHours} hours`] : []
         },
       },
     },
@@ -296,6 +363,10 @@ function weatherCodeLabel(code: number) {
   return 'Mixed clouds'
 }
 
+function formatWeekday(date: string) {
+  return new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
+}
+
 async function updateWeather() {
   const city = cityQuery.value.trim()
   if (!city) return
@@ -307,7 +378,7 @@ async function updateWeather() {
     const geoData = await geoResponse.json()
     const place = geoData.results?.[0]
     if (!place) throw new Error('No matching place found. Try another city.')
-    const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&timezone=auto`)
+    const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,precipitation_probability_max,sunshine_duration&forecast_days=7&timezone=auto`)
     if (!weatherResponse.ok) throw new Error('The forecast could not be loaded.')
     const weatherData = await weatherResponse.json()
     weatherNow.value = {
@@ -317,6 +388,13 @@ async function updateWeather() {
       humidity: Math.round(weatherData.current.relative_humidity_2m),
       city: place.name,
       country: place.country,
+      forecast: weatherData.daily.time.map((date: string, index: number) => ({
+        date,
+        code: weatherData.daily.weather_code[index],
+        high: Math.round(weatherData.daily.temperature_2m_max[index]),
+        precipitationProbability: weatherData.daily.precipitation_probability_max[index] ?? 0,
+        sunshineHours: Math.round((weatherData.daily.sunshine_duration[index] ?? 0) / 360) / 10,
+      })),
     }
   } catch (error) {
     weatherError.value = error instanceof Error ? error.message : 'Weather is unavailable.'
@@ -448,7 +526,7 @@ onMounted(() => {
           </div>
           <div class="heading-seal" aria-hidden="true">
             <span class="seal-rays"></span>
-            <PawPrint :size="32" weight="duotone" />
+            <CatIcon :size="32" weight="duotone" />
             <span>JPC · EST.</span>
           </div>
         </section>
@@ -466,22 +544,22 @@ onMounted(() => {
           <article class="metric-card metric-forest">
             <div class="metric-topline"><span>VANQUISHED</span><PawPrint :size="18" weight="duotone" /></div>
             <strong>{{ totals.kills.toLocaleString() }}</strong>
-            <div class="metric-foot"><span class="metric-marker"></span><span>pests sent packing</span><span class="metric-trend"><ArrowUpRight :size="13" /> {{ totals.rate }}%</span></div>
+            <div class="metric-foot"><span class="metric-marker"></span><span>pests sent packing</span><span class="metric-trend">{{ totals.vanquishRate }}% vanquish rate</span></div>
           </article>
           <article class="metric-card metric-coral">
             <div class="metric-topline"><span>SIGHTINGS</span><WarningCircle :size="18" weight="duotone" /></div>
             <strong>{{ totals.sightings.toLocaleString() }}</strong>
-            <div class="metric-foot"><span class="metric-marker"></span><span>across {{ metrics.rooms.length }} rooms</span><span class="metric-trend">{{ totals.rate }}% handled</span></div>
+            <div class="metric-foot"><span class="metric-marker"></span><span>across {{ metrics.rooms.length }} rooms</span><span class="metric-trend">{{ filteredDays.length }} tracked days</span></div>
           </article>
           <article class="metric-card metric-blue">
-            <div class="metric-topline"><span>TREAT PAY</span><Package :size="18" weight="duotone" /></div>
-            <strong>{{ totals.treats.toLocaleString() }}</strong>
-            <div class="metric-foot"><span class="metric-marker"></span><span>well-earned pieces</span><span class="metric-trend">{{ totals.shifts }} shifts</span></div>
+            <div class="metric-topline"><span>TREAT REVENUE</span><Package :size="18" weight="duotone" /></div>
+            <strong>{{ totals.treatRevenue.toLocaleString() }}</strong>
+            <div class="metric-foot"><span class="metric-marker"></span><span>client-paid treat units</span><span class="metric-trend">{{ totals.treats.toLocaleString() }} paid out</span></div>
           </article>
           <article class="metric-card metric-gold">
             <div class="metric-topline"><span>NAP BREAKS</span><Sun :size="18" weight="duotone" /></div>
             <strong>{{ totals.naps.toLocaleString() }}</strong>
-            <div class="metric-foot"><span class="metric-marker"></span><span>recharging hours</span><span class="metric-trend">2 employees</span></div>
+            <div class="metric-foot"><span class="metric-marker"></span><span>recharging breaks</span><span class="metric-trend">{{ totals.averageEnjoyment }}/5 joy</span></div>
           </article>
         </section>
 
@@ -501,6 +579,15 @@ onMounted(() => {
               <div class="weather-details"><span><Wind :size="15" /> {{ weatherNow.wind }} km/h</span><span><span class="humidity-mark">%</span> {{ weatherNow.humidity }}% humidity</span></div>
             </div>
             <div v-else-if="!weatherLoading" class="weather-empty"><p>Find the local forecast by entering a city above.</p></div>
+            <div v-if="weatherNow?.forecast.length" class="forecast-strip" aria-label="Seven-day forecast">
+              <div v-for="day in weatherNow.forecast" :key="day.date" class="forecast-day" :title="`${formatWeekday(day.date)}: ${day.high}° high, ${day.precipitationProbability}% rain chance, ${day.sunshineHours} hours sun`">
+                <span>{{ formatWeekday(day.date).split(',')[0] }}</span>
+                <CloudRain v-if="day.precipitationProbability >= 40" :size="15" />
+                <CloudSun v-else :size="15" />
+                <strong>{{ day.high }}°</strong>
+                <small>{{ day.precipitationProbability }}%</small>
+              </div>
+            </div>
             <div class="weather-history"><span><Sun :size="14" /> {{ weatherStats.clear }} clear workdays</span><span class="history-divider"></span><span>{{ weatherStats.wet }} rainy patrols</span><span class="history-average">{{ weatherStats.average }}° avg.</span></div>
           </article>
 
@@ -522,7 +609,7 @@ onMounted(() => {
           <article class="panel chart-panel trend-panel">
             <div class="panel-heading"><div><p class="panel-eyebrow">FIELD NOTES · {{ periodLabel.toUpperCase() }}</p><h2>Seen, then sorted</h2></div><div class="chart-legend"><span><i class="legend-dot coral-dot"></i>Sightings</span><span><i class="legend-dot green-dot"></i>Vanquished</span></div></div>
             <div class="chart-wrap"><Line :data="monthlyData" :options="chartOptions" /></div>
-            <p class="chart-alt">{{ totals.sightings.toLocaleString() }} sightings and {{ totals.kills.toLocaleString() }} vanquishes {{ selectedMonth === 'all' ? 'year to date' : `in ${periodLabel}` }}. Workday weather averaged {{ weatherStats.average }}°; {{ weatherStats.wet }} days brought rain.</p>
+            <p class="chart-alt">{{ totals.sightings.toLocaleString() }} sightings and {{ totals.kills.toLocaleString() }} vanquishes {{ selectedMonth === 'all' ? 'year to date' : `in ${periodLabel}` }}. Clear, dry patrols averaged {{ weatherImpact.clearAverage ?? '—' }} vanquishes; rainy patrols averaged {{ weatherImpact.wetAverage ?? '—' }}.</p>
           </article>
           <article class="panel chart-panel room-panel">
             <div class="panel-heading"><div><p class="panel-eyebrow">ROOM-BY-ROOM</p><h2>Where the paws land</h2></div><span class="mini-tag"><House :size="14" /> {{ roomRows[0]?.name }} leads</span></div>
@@ -535,7 +622,7 @@ onMounted(() => {
           <article class="panel chart-panel">
             <div class="panel-heading"><div><p class="panel-eyebrow">LAST 14 PATROLS</p><h2>Day by day</h2></div><span class="chart-caption">Daily vanquishes</span></div>
             <div class="chart-wrap compact-chart"><Line :data="dailyChartData" :options="dailyChartOptions" /></div>
-            <p class="chart-alt">Daily counts from {{ recentDays[0]?.date }} through {{ recentDays[recentDays.length - 1]?.date }}. Hover a patrol for its recorded weather and rain chance; {{ weatherStats.clear }} clear and {{ weatherStats.wet }} wet patrols in this period.</p>
+            <p class="chart-alt">Daily counts from {{ recentDays[0]?.date }} through {{ recentDays[recentDays.length - 1]?.date }}. Hover a patrol for recorded Oakland rainfall and sunshine. The selected period includes {{ weatherStats.clear }} clear and {{ weatherStats.wet }} wet patrols.</p>
           </article>
           <article class="panel chart-panel">
             <div class="panel-heading"><div><p class="panel-eyebrow">THE BUSY HOURS</p><h2>Prime pouncing time</h2></div><span class="chart-caption">{{ totals.kills.toLocaleString() }} total</span></div>
@@ -546,7 +633,7 @@ onMounted(() => {
 
         <section class="bottom-grid">
           <article class="panel room-list-panel">
-            <div class="panel-heading"><div><p class="panel-eyebrow">HOUSE MAP</p><h2>Rooms under watch</h2></div><button class="round-link" aria-label="View all rooms"><ArrowUpRight :size="17" /></button></div>
+            <div class="panel-heading"><div><p class="panel-eyebrow">HOUSE MAP</p><h2>Rooms under watch</h2></div></div>
             <div class="room-list">
               <div v-for="(room, index) in roomRows" :key="room.id" class="room-row">
                 <span class="room-order">0{{ index + 1 }}</span><span class="room-name">{{ room.name }}</span><span class="room-meter"><i :style="{ width: `${Math.max(7, (room.sightings / Math.max(1, roomRows[0]?.sightings)) * 100)}%` }"></i></span><strong>{{ room.sightings }}</strong><span class="room-unit">sightings</span>
@@ -573,6 +660,21 @@ onMounted(() => {
             </div>
           </article>
         </section>
+
+        <section class="panel matrix-panel">
+          <div class="panel-heading matrix-heading"><div><p class="panel-eyebrow">ROOM × PEST LEDGER</p><h2>Sightings and vanquishes by room</h2></div><span class="chart-caption">Seen / vanquished · {{ periodLabel }}</span></div>
+          <div class="table-scroll matrix-scroll">
+            <table class="room-pest-table">
+              <thead><tr><th scope="col">Room</th><th v-for="pest in metrics.pests.filter((item) => selectedPest === 'all' || item.id === selectedPest)" :key="pest.id" scope="col">{{ pest.name }}<small>Seen / caught</small></th></tr></thead>
+              <tbody>
+                <tr v-for="room in roomPestRows" :key="room.id">
+                  <th scope="row">{{ room.name }}</th>
+                  <td v-for="pest in room.pests" :key="pest.id"><strong>{{ pest.sightings.toLocaleString() }} / {{ pest.kills.toLocaleString() }}</strong><span class="matrix-rate"><i :style="{ width: `${pest.vanquishRate}%` }"></i></span><small>{{ pest.vanquishRate }}% vanquish rate</small></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </template>
 
       <template v-else-if="activePage === 'payroll'">
@@ -582,7 +684,7 @@ onMounted(() => {
         </section>
         <section class="filter-row"><div class="filter-context"><span class="live-dot"></span><strong>{{ periodLabel }}</strong><span class="filter-divider"></span><span>Team ledger</span></div><div class="filter-controls"><label class="filter-select-wrap"><span class="sr-only">Filter payroll by month</span><select v-model="selectedMonth" aria-label="Filter payroll by month"><option value="all">Year to date</option><option v-for="(month, index) in availableMonths" :key="month" :value="String(index)">{{ month }} {{ metrics.year }}</option></select><span class="filter-select-value" aria-hidden="true">{{ selectedMonthLabel }}</span><CaretDown :size="13" /></label></div></section>
         <section class="payroll-summary">
-          <div class="payroll-total"><span class="panel-eyebrow">TREAT PAY · {{ periodLabel.toUpperCase() }}</span><strong>{{ payrollRows.reduce((sum, row) => sum + row.treats, 0).toLocaleString() }} <small>treats</small></strong><span>{{ totals.shifts }} completed shifts and {{ totals.naps }} earned naps</span></div>
+          <div class="payroll-total"><span class="panel-eyebrow">TREAT PAY · {{ periodLabel.toUpperCase() }}</span><strong>{{ payrollRows.reduce((sum, row) => sum + row.treats, 0).toLocaleString() }} <small>treats</small></strong><span>{{ totals.shifts }} shifts · {{ totals.naps }} naps · {{ totals.averageEnjoyment }}/5 average enjoyment</span></div>
           <div class="payroll-stamp"><PawPrint :size="28" weight="duotone" /><span>GOOD<br />CATS</span></div>
         </section>
         <section class="payroll-grid">
@@ -590,13 +692,13 @@ onMounted(() => {
             <div class="employee-top"><div class="employee-avatar" :style="{ '--employee-color': employee.color }">{{ employee.name.slice(0, 1) }}</div><span class="shift-pill">{{ employee.shift }} SHIFT</span></div>
             <p class="employee-role">{{ employee.title }}</p><h2>{{ employee.name }}</h2>
             <div class="employee-pay"><span>Earned this period</span><strong>{{ employee.treats.toLocaleString() }} <small>treats</small></strong></div>
-            <div class="employee-stats"><span><strong>{{ employee.days }}</strong> days</span><span><strong>{{ employee.kills.toLocaleString() }}</strong> vanquished</span><span><strong>{{ employee.naps }}</strong> naps</span></div>
+            <div class="employee-stats"><span><strong>{{ employee.days }}</strong> days</span><span><strong>{{ employee.kills.toLocaleString() }}</strong> vanquished</span><span><strong>{{ employee.naps }}</strong> naps</span><span><strong>{{ employee.enjoyment }}/5</strong> enjoyment</span></div>
             <div class="employee-progress"><span :style="{ width: `${Math.min(100, Math.round(employee.days / Math.max(1, ...payrollRows.map((row) => row.days)) * 100))}%` }"></span></div>
           </article>
         </section>
         <section class="panel payroll-table-panel">
           <div class="panel-heading"><div><p class="panel-eyebrow">SHIFT RECORDS</p><h2>Earned, not given</h2></div><span class="chart-caption">A.M. / P.M. rotations</span></div>
-          <div class="table-scroll"><table><thead><tr><th>Employee</th><th>Shift</th><th>Days worked</th><th>Vanquished</th><th>Treat pay</th><th>Nap breaks</th></tr></thead><tbody><tr v-for="employee in payrollRows" :key="employee.id"><td><span class="table-employee"><i :style="{ background: employee.color }"></i>{{ employee.name }}</span></td><td>{{ employee.shift }}</td><td>{{ employee.days }}</td><td>{{ employee.kills.toLocaleString() }}</td><td class="table-pay">{{ employee.treats.toLocaleString() }} pcs</td><td>{{ employee.naps }}</td></tr></tbody></table></div>
+          <div class="table-scroll"><table><thead><tr><th>Employee</th><th>Shift</th><th>Days worked</th><th>Vanquished</th><th>Treat pay</th><th>Nap breaks</th><th>Enjoyment</th></tr></thead><tbody><tr v-for="employee in payrollRows" :key="employee.id"><td><span class="table-employee"><i :style="{ background: employee.color }"></i>{{ employee.name }}</span></td><td>{{ employee.shift }}</td><td>{{ employee.days }}</td><td>{{ employee.kills.toLocaleString() }}</td><td class="table-pay">{{ employee.treats.toLocaleString() }} pcs</td><td>{{ employee.naps }}</td><td>{{ employee.enjoyment }}/5</td></tr></tbody></table></div>
         </section>
       </template>
 

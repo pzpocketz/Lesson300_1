@@ -49,29 +49,45 @@ const inventory = [
   { id: 'feather-wands', name: 'Feather wands', category: 'Training kit', quantity: 7, unit: 'wands', threshold: 2 },
 ]
 
-const monthlyTemperatures = [1, 3, 8, 14, 20, 25, 28, 27, 22, 16, 9, 4]
-const weatherKinds = [
-  { code: 0, label: 'Clear', chance: 0.4 },
-  { code: 2, label: 'Partly cloudy', chance: 0.34 },
-  { code: 3, label: 'Overcast', chance: 0.12 },
-  { code: 61, label: 'Light rain', chance: 0.1 },
-  { code: 63, label: 'Rain', chance: 0.04 },
-]
-
-function chooseWeather() {
-  const pick = random()
-  let cumulative = 0
-  return weatherKinds.find((weather) => {
-    cumulative += weather.chance
-    return pick <= cumulative
-  }) ?? weatherKinds[1]
+function describeWeather(code) {
+  if (code === 0) return 'Clear'
+  if ([1, 2].includes(code)) return 'Partly cloudy'
+  if (code === 3) return 'Overcast'
+  if ([45, 48].includes(code)) return 'Fog'
+  if (code >= 51 && code <= 67) return 'Rain'
+  if (code >= 71 && code <= 77) return 'Snow'
+  if (code >= 80 && code <= 82) return 'Rain showers'
+  if (code >= 95) return 'Thunderstorms'
+  return 'Mixed clouds'
 }
+
+const dateString = (date) => date.toISOString().slice(0, 10)
+const archiveUrl = new URL('https://archive-api.open-meteo.com/v1/archive')
+archiveUrl.search = new URLSearchParams({
+  latitude: '37.8044',
+  longitude: '-122.2712',
+  start_date: `${year}-01-01`,
+  end_date: dateString(lastDate),
+  daily: 'weather_code,temperature_2m_mean,precipitation_sum,sunshine_duration',
+  timezone: 'America/Los_Angeles',
+}).toString()
+const archiveResponse = await fetch(archiveUrl)
+if (!archiveResponse.ok) throw new Error(`Open-Meteo archive request failed: ${archiveResponse.status}`)
+const archiveData = await archiveResponse.json()
+const historicalWeather = new Map(archiveData.daily.time.map((date, index) => [date, {
+  code: archiveData.daily.weather_code[index],
+  temperature: Math.round(archiveData.daily.temperature_2m_mean[index]),
+  precipitationMm: Math.round((archiveData.daily.precipitation_sum[index] ?? 0) * 10) / 10,
+  sunshineHours: Math.round((archiveData.daily.sunshine_duration[index] ?? 0) / 360) / 10,
+}]))
 
 const daily = []
 for (let date = new Date(Date.UTC(year, 0, 1)); date <= lastDate; date.setUTCDate(date.getUTCDate() + 1)) {
   const month = date.getUTCMonth()
-  const weather = chooseWeather()
-  const openWindowFactor = month >= 3 && month <= 8 ? 1.2 : 1
+  const dayKey = dateString(date)
+  const weather = historicalWeather.get(dayKey)
+  if (!weather) throw new Error(`Missing Open-Meteo archive record for ${dayKey}`)
+  const openWindowFactor = weather.temperature >= 18 && weather.precipitationMm < 1 ? 1.2 : 1
   const roomRecords = rooms.map((room) => {
     const roomPests = pests.map((pest) => {
       const mean = pest.base * pest.season[month] * room.activity * openWindowFactor * (0.72 + random() * 0.56)
@@ -100,6 +116,7 @@ for (let date = new Date(Date.UTC(year, 0, 1)); date <= lastDate; date.setUTCDat
       kills: assignedKills,
       treats: Math.round(assignedKills * employee.treatRate + between(3, 8)),
       naps: between(1, 3),
+      enjoymentScore: Math.max(1, Math.min(5, Math.round(3.2 + Math.min(weather.sunshineHours, 8) * 0.1 + (assignedKills > 8 ? 0.3 : 0) + (random() - 0.5) * 1.5))),
     }
   })
   const hourlyKills = Array.from({ length: 10 }, () => 0)
@@ -107,27 +124,26 @@ for (let date = new Date(Date.UTC(year, 0, 1)); date <= lastDate; date.setUTCDat
     const hour = Math.min(9, Math.floor(Math.pow(random(), 0.72) * 10))
     hourlyKills[hour] += 1
   }
-  const temperature = monthlyTemperatures[month] + between(-4, 4)
-  const dayKey = date.toISOString().slice(0, 10)
-
   daily.push({
     date: dayKey,
     weather: {
       code: weather.code,
-      label: weather.label,
-      temperature,
-      rainProbability: weather.label.includes('rain') ? between(46, 88) : between(0, 32),
+      label: describeWeather(weather.code),
+      temperature: weather.temperature,
+      precipitationMm: weather.precipitationMm,
+      sunshineHours: weather.sunshineHours,
     },
     rooms: roomRecords,
     crew,
     hourlyKills,
     sightings: roomRecords.reduce((sum, room) => sum + room.sightings, 0),
     kills: totalKills,
+    treatRevenue: totalKills * 5 + (crew.length ? between(4, 10) : 0),
   })
 }
 
-const dataset = { year, rooms, pests: pests.map(({ id, name }) => ({ id, name })), employees, inventory, daily }
+const dataset = { year, weatherSource: 'Open-Meteo archive', weatherLocation: 'Oakland, California', rooms, pests: pests.map(({ id, name }) => ({ id, name })), employees, inventory, daily }
 const outputPath = resolve(projectRoot, 'src/data/metrics.json')
 mkdirSync(dirname(outputPath), { recursive: true })
 writeFileSync(outputPath, `${JSON.stringify(dataset, null, 2)}\n`)
-console.log(`Generated ${daily.length} year-to-date records through ${lastDate.toISOString().slice(0, 10)}: ${outputPath}`)
+console.log(`Generated ${daily.length} year-to-date records through ${dateString(lastDate)} with Oakland weather: ${outputPath}`)
