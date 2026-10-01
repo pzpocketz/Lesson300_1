@@ -222,6 +222,9 @@ const alertItems = computed(() => {
 })
 
 const periodLabel = computed(() => selectedMonth.value === 'all' ? `Full year ${metrics.year}` : `${monthNames[Number(selectedMonth.value)]} ${metrics.year}`)
+const selectedMonthLabel = computed(() => selectedMonth.value === 'all' ? 'All months' : `${monthNames[Number(selectedMonth.value)]} ${metrics.year}`)
+const selectedRoomLabel = computed(() => selectedRoom.value === 'all' ? 'Every room' : metrics.rooms.find((room) => room.id === selectedRoom.value)?.name ?? 'Every room')
+const selectedPestLabel = computed(() => selectedPest.value === 'all' ? 'All pests' : metrics.pests.find((pest) => pest.id === selectedPest.value)?.name ?? 'All pests')
 const weatherDescription = computed(() => weatherNow.value ? weatherCodeLabel(weatherNow.value.code) : '')
 const weatherStats = computed(() => {
   const observations = filteredDays.value.filter((day) => day.crew.length > 0).map((day) => day.weather)
@@ -446,9 +449,9 @@ onMounted(() => {
         <section class="filter-row" aria-label="Dashboard filters">
           <div class="filter-context"><span class="live-dot"></span><strong>{{ periodLabel }}</strong><span class="filter-divider"></span><span>Field ledger</span></div>
           <div class="filter-controls">
-            <label class="filter-select-wrap"><span class="sr-only">Filter by month</span><select v-model="selectedMonth" aria-label="Filter by month"><option value="all">All months</option><option v-for="(month, index) in monthNames" :key="month" :value="String(index)">{{ month }} {{ metrics.year }}</option></select><CaretDown :size="13" /></label>
-            <label class="filter-select-wrap"><span class="sr-only">Filter by room</span><select v-model="selectedRoom" aria-label="Filter by room"><option value="all">Every room</option><option v-for="room in metrics.rooms" :key="room.id" :value="room.id">{{ room.name }}</option></select><CaretDown :size="13" /></label>
-            <label class="filter-select-wrap"><span class="sr-only">Filter by pest</span><select v-model="selectedPest" aria-label="Filter by pest"><option value="all">All pests</option><option v-for="pest in metrics.pests" :key="pest.id" :value="pest.id">{{ pest.name }}</option></select><CaretDown :size="13" /></label>
+            <label class="filter-select-wrap"><span class="sr-only">Filter by month</span><select v-model="selectedMonth" aria-label="Filter by month"><option value="all">All months</option><option v-for="(month, index) in monthNames" :key="month" :value="String(index)">{{ month }} {{ metrics.year }}</option></select><span class="filter-select-value" aria-hidden="true">{{ selectedMonthLabel }}</span><CaretDown :size="13" /></label>
+            <label class="filter-select-wrap"><span class="sr-only">Filter by room</span><select v-model="selectedRoom" aria-label="Filter by room"><option value="all">Every room</option><option v-for="room in metrics.rooms" :key="room.id" :value="room.id">{{ room.name }}</option></select><span class="filter-select-value" aria-hidden="true">{{ selectedRoomLabel }}</span><CaretDown :size="13" /></label>
+            <label class="filter-select-wrap"><span class="sr-only">Filter by pest</span><select v-model="selectedPest" aria-label="Filter by pest"><option value="all">All pests</option><option v-for="pest in metrics.pests" :key="pest.id" :value="pest.id">{{ pest.name }}</option></select><span class="filter-select-value" aria-hidden="true">{{ selectedPestLabel }}</span><CaretDown :size="13" /></label>
           </div>
         </section>
 
@@ -562,7 +565,7 @@ onMounted(() => {
           <div><p class="eyebrow"><span class="eyebrow-rule"></span> THE HOME PATROL · {{ metrics.year }}</p><h1>A fair day's catch.</h1><p class="heading-subtitle">Two good cats, honest work, and a treat for every triumph.</p></div>
           <button class="primary-action" @click="exportPayroll"><ArrowUpRight :size="16" /> Export pawroll</button>
         </section>
-        <section class="filter-row"><div class="filter-context"><span class="live-dot"></span><strong>{{ periodLabel }}</strong><span class="filter-divider"></span><span>Team ledger</span></div><div class="filter-controls"><label class="filter-select-wrap"><span class="sr-only">Filter payroll by month</span><select v-model="selectedMonth" aria-label="Filter payroll by month"><option value="all">All months</option><option v-for="(month, index) in monthNames" :key="month" :value="String(index)">{{ month }} {{ metrics.year }}</option></select><CaretDown :size="13" /></label></div></section>
+        <section class="filter-row"><div class="filter-context"><span class="live-dot"></span><strong>{{ periodLabel }}</strong><span class="filter-divider"></span><span>Team ledger</span></div><div class="filter-controls"><label class="filter-select-wrap"><span class="sr-only">Filter payroll by month</span><select v-model="selectedMonth" aria-label="Filter payroll by month"><option value="all">All months</option><option v-for="(month, index) in monthNames" :key="month" :value="String(index)">{{ month }} {{ metrics.year }}</option></select><span class="filter-select-value" aria-hidden="true">{{ selectedMonthLabel }}</span><CaretDown :size="13" /></label></div></section>
         <section class="payroll-summary">
           <div class="payroll-total"><span class="panel-eyebrow">TREAT PAY · {{ periodLabel.toUpperCase() }}</span><strong>{{ payrollRows.reduce((sum, row) => sum + row.treats, 0).toLocaleString() }} <small>treats</small></strong><span>{{ totals.shifts }} completed shifts and {{ totals.naps }} earned naps</span></div>
           <div class="payroll-stamp"><PawPrint :size="28" weight="duotone" /><span>GOOD<br />CATS</span></div>

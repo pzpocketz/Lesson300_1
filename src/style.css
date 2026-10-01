@@ -114,8 +114,9 @@ h2 { margin-top: 4px; color: var(--ink); font-family: var(--display); font-size:
 .live-dot { width: 7px; height: 7px; border-radius: 50%; background: #4a9674; box-shadow: 0 0 0 4px rgba(74, 150, 116, .12); }
 .filter-divider, .history-divider { width: 1px; height: 16px; margin: 0 8px; background: var(--line); }
 .filter-controls { gap: 8px; }
-.filter-select-wrap { position: relative; gap: 8px; min-height: 36px; padding: 0 8px 0 12px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); background: var(--surface); }
-.filter-select-wrap select { width: 100%; min-width: 88px; max-width: 140px; height: 34px; appearance: none; border: 0; outline: 0; color: inherit; background: transparent; cursor: pointer; font-size: 11px; }
+.filter-select-wrap { position: relative; gap: 8px; min-height: 36px; padding: 0 8px 0 12px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); background: var(--surface); cursor: pointer; }
+.filter-select-wrap select { position: absolute; z-index: 2; inset: -1px; width: calc(100% + 2px); min-width: 0; max-width: none; height: calc(100% + 2px); appearance: none; border: 0; border-radius: inherit; opacity: 0; cursor: pointer; }
+.filter-select-value { flex: 1; min-width: 0; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
 .filter-select-wrap svg { flex: none; pointer-events: none; }
 .filter-select-wrap:focus-within { outline: 3px solid #278b79; outline-offset: 3px; }
 
@@ -354,7 +355,7 @@ tbody tr:last-child td { border-bottom: 0; }
   .filter-context { min-height: 24px; }
   .filter-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .filter-select-wrap { gap: 2px; padding: 0 4px 0 8px; }
-  .filter-select-wrap select { min-width: 0; max-width: none; font-size: 10px; }
+  .filter-select-value { font-size: 10px; }
   .filter-select-wrap svg { width: 12px; }
   .metrics-grid { gap: 8px; }
   .metric-card { min-height: 120px; padding: 12px; }
